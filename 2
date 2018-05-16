@@ -1,0 +1,80 @@
+library ieee;
+use ieee.std_logic_1164.all;
+use ieee.std_numeric.all;
+
+use work.com.all;
+
+entity render
+  port (
+    clock: in std_logic;
+    render_restart in std_logic;
+    render_finish: out std_logic;
+    VGA_R, VGA_G, VGA_B: in std_logic_vector(7 downto 0);
+    VGA_HS, VGA_VS: out std_logic;
+    VGA_BLANK_N, VGA_SYNC_N: out std_logic;
+    VGA_CLK: out std_logic;
+  );
+end render;
+
+architecture rtl of render
+  type render_s is (init_s, prog_block, prog_resetmsg, prog_scoredigit,
+                    prog_win, prog_lose, oper_rb, fsig_s, end_s)
+  signal state, next_state, next_prog: render_s := end_s;
+
+  signal sync, blank: std_logic;
+
+  signal rb_x: integer range 0 to SCREEN_W-1;
+  signal rb_y: integer range 0 to SCREEN_H-1;
+  signal pixel_rb: std_logic_vector(7 downto 0);
+  signal en_rb, rb_restart, rb_finish: std_logic := 0;
+  signal addr_rb: integer range 0 to SCREEN_W*SCREEN_H-1;
+begin
+  vgac: entity work.vgacon port map (
+    clk50M       => clock,
+    rstn         => '1',
+    red          => VGA_R,
+    green        => VGA_G,
+    blue         => VGA_B,
+    hsync        => VGA_HS,
+    vsync        => VGA_VS,
+    write_clk    => CLOCK_50,
+    write_enable => en_rb,
+    write_addr   => addr_rb,
+    data_in      => pixel_rb,
+    vga_clk      => VGA_CLK,
+    sync         => sync,
+    blank        => blank
+  );
+  VGA_SYNC_N <= NOT sync;
+  VGA_BLANK_N <= NOT blank;
+
+  rb: render_bitmap port map (rb_restart, clock, nbm, x, y, pixel_rb, addr_rb, en_rb, rb_finish);
+
+  r_sm: process render_sm (state) begin
+    case state is
+      when init_s =>
+        next_state <= prog_block;
+      when prog_block =>
+        next_state <= oper_rb;
+      when prog_resetmsg =>
+        next_state <= oper_rb;
+      when prog_scoredigit =>
+        next_state <= oper_rb;
+      when prog_win =>
+        next_state <= oper_rb;
+      when prog_lose =>
+        next_state <= oper_rb;
+      when oper_rb =>
+        if finish_rb
+        next_state <= next_prog;
+      when fsig_s =>
+      when end_s =>
+    end case;
+  end process next_sm; 
+
+  process next_sm: process (clock, reset) begin
+    if rising_edge(clock)
+      state <= next_state;
+    end if;
+  end process next_sm;
+end rtl;
